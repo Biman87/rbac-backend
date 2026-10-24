@@ -1,0 +1,72 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Role Model ───────────────────────────────────────────────────────────────
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+// ─── Permission Model ─────────────────────────────────────────────────────────
+// A permission represents one allowed action on a resource.
+// Convention: action = verb (create, read, update, delete, manage)
+//             resource = noun (users, roles, permissions, reports …)
+// The unique compound index on (action, resource) prevents duplicates while
+// still allowing action "read" on both "users" and "reports".
+model Permission {
+  id          String           @id @default(cuid())
+  name        String           @unique  // human label, e.g. "Read Users"
+  action      String                    // e.g. "read", "create", "delete", "manage"
+  resource    String                    // e.g. "users", "roles", "reports"
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  roles       RolePermission[]
+
+  @@unique([action, resource])          // one permission per action+resource pair
+  @@map("permissions")
+}
+
+// ─── RolePermission join table ────────────────────────────────────────────────
+model RolePermission {
+  roleId       String
+  permissionId String
+  assignedAt   DateTime @default(now())
+
+  role         Role       @relation(fields: [roleId],       references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── User Model ───────────────────────────────────────────────────────────────
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  isActive  Boolean  @default(true)   // false = deactivated / suspended
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
