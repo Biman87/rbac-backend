@@ -1,29 +1,43 @@
 // src/routes/auth.routes.js
 
 import { Router } from 'express';
-import { validate } from '../middlewares/validate.js';
-import { protect } from '../middlewares/auth.middleware.js';
+import { validate }        from '../middlewares/validate.js';
+import { protect }         from '../middlewares/auth.middleware.js';
 import { authRateLimiter } from '../middlewares/security.js';
-import { registerSchema, loginSchema } from '../validations/auth.validation.js';
+import {
+  registerSchema,
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  resendVerificationSchema,
+} from '../validations/auth.validation.js';
 import {
   register,
   login,
   logout,
+  refresh,
   getMe,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
 } from '../controllers/auth.controller.js';
 
 const router = Router();
 
-// POST /api/v1/auth/register  — strict rate limit (20 req / 15 min per IP)
-router.post('/register', authRateLimiter, validate(registerSchema), register);
+// ── Core auth ─────────────────────────────────────────────────────────────────
+router.post('/register', authRateLimiter, validate(registerSchema),  register);
+router.post('/login',    authRateLimiter, validate(loginSchema),     login);
+router.post('/logout',   logout);
+router.post('/refresh',  refresh);                  // uses refreshToken cookie — no body needed
+router.get ('/me',       protect, getMe);
 
-// POST /api/v1/auth/login     — strict rate limit
-router.post('/login', authRateLimiter, validate(loginSchema), login);
+// ── Email verification ────────────────────────────────────────────────────────
+router.get ('/verify-email/:token',  verifyEmail);
+router.post('/resend-verification',  authRateLimiter, validate(resendVerificationSchema), resendVerification);
 
-// POST /api/v1/auth/logout
-router.post('/logout', logout);
-
-// GET /api/v1/auth/me  (protected)
-router.get('/me', protect, getMe);
+// ── Password reset ────────────────────────────────────────────────────────────
+router.post ('/forgot-password',         authRateLimiter, validate(forgotPasswordSchema), forgotPassword);
+router.patch('/reset-password/:token',   authRateLimiter, validate(resetPasswordSchema),  resetPassword);
 
 export default router;

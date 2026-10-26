@@ -67,13 +67,13 @@ async function main() {
   // ── Seed users ─────────────────────────────────────────────────────────────
   const [admin, manager, customer] = await Promise.all([
     prisma.user.create({
-      data: { email: 'admin@example.com',    password: await bcrypt.hash('Admin@1234',    12), roleId: adminRole.id    },
+      data: { email: 'admin@example.com',    password: await bcrypt.hash('Admin@1234',    12), roleId: adminRole.id,    isEmailVerified: true },
     }),
     prisma.user.create({
-      data: { email: 'manager@example.com',  password: await bcrypt.hash('Manager@1234',  12), roleId: managerRole.id  },
+      data: { email: 'manager@example.com',  password: await bcrypt.hash('Manager@1234',  12), roleId: managerRole.id,  isEmailVerified: true },
     }),
     prisma.user.create({
-      data: { email: 'customer@example.com', password: await bcrypt.hash('Customer@1234', 12), roleId: customerRole.id },
+      data: { email: 'customer@example.com', password: await bcrypt.hash('Customer@1234', 12), roleId: customerRole.id, isEmailVerified: true },
     }),
   ]);
 

@@ -1,40 +1,45 @@
 // src/utils/cookie.js
-// Centralised cookie options so they stay consistent across
-// login and logout handlers.
+// Centralised cookie helpers for access token and refresh token cookies.
 
 import { env } from '../config/env.js';
 
-/**
- * Returns the options object for the auth cookie.
- * @returns {import('express').CookieOptions}
- */
-export function cookieOptions() {
+// ─── Shared options factory ───────────────────────────────────────────────────
+
+function baseCookieOptions(maxAgeMs) {
   return {
-    httpOnly: true,                        // not accessible via document.cookie
-    secure: env.isProduction,              // HTTPS-only in production
-    sameSite: env.isProduction ? 'strict' : 'lax', // CSRF protection
-    maxAge: env.COOKIE_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000, // ms
+    httpOnly: true,
+    secure:   env.isProduction,
+    sameSite: env.isProduction ? 'strict' : 'lax',
+    maxAge:   maxAgeMs,
   };
 }
 
-/**
- * Signs the token and attaches it as an HTTP-only cookie on the response.
- * Also returns the token so tests / other callers can inspect it.
- * @param {import('express').Response} res
- * @param {string} token
- */
+// ─── Access token cookie ──────────────────────────────────────────────────────
+
 export function attachAuthCookie(res, token) {
-  res.cookie('token', token, cookieOptions());
+  res.cookie('token', token, baseCookieOptions(
+    env.COOKIE_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000
+  ));
 }
 
-/**
- * Clears the auth cookie.
- * @param {import('express').Response} res
- */
 export function clearAuthCookie(res) {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: env.isProduction,
-    sameSite: env.isProduction ? 'strict' : 'lax',
+  res.clearCookie('token', baseCookieOptions(0));
+}
+
+// ─── Refresh token cookie ─────────────────────────────────────────────────────
+
+/** Refresh token lives in its own HTTP-only cookie, separate from the access token. */
+export function attachRefreshCookie(res, rawToken, expiresAt) {
+  const maxAge = expiresAt.getTime() - Date.now();
+  res.cookie('refreshToken', rawToken, {
+    ...baseCookieOptions(maxAge),
+    path: '/api/v1/auth/refresh',   // restrict to refresh endpoint only
+  });
+}
+
+export function clearRefreshCookie(res) {
+  res.clearCookie('refreshToken', {
+    ...baseCookieOptions(0),
+    path: '/api/v1/auth/refresh',
   });
 }

@@ -2,10 +2,11 @@
 // Shared test utilities: database helpers, fixture factories, and
 // a supertest agent factory that handles cookie-based auth.
 
-import bcrypt from 'bcryptjs';
+import bcrypt    from 'bcryptjs';
+import crypto    from 'crypto';
 import supertest from 'supertest';
-import app from '../app.js';
-import prisma from '../config/prisma.js';
+import app       from '../app.js';
+import prisma    from '../config/prisma.js';
 
 // ─── Supertest agent ──────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ export async function createTestUser({
   const hashed = await bcrypt.hash(password, 10); // lower cost for speed in tests
 
   const user = await prisma.user.create({
-    data: { email, password: hashed, roleId: role.id },
+    data: { email, password: hashed, roleId: role.id, isEmailVerified: true },
     include: { role: true },
   });
 
@@ -88,4 +89,49 @@ export async function cleanupRoles(namePattern) {
   await prisma.role.deleteMany({
     where: { name: { contains: namePattern } },
   });
+}
+
+/**
+ * Creates a test user whose email is NOT verified.
+ * Used by email-verification tests.
+ */
+export async function createUnverifiedUser({
+  email    = `unverified_${Date.now()}@example.com`,
+  password = 'Test@1234',
+  roleName = 'CUSTOMER',
+} = {}) {
+  const role   = await findOrCreateRole(roleName);
+  const hashed = await bcrypt.hash(password, 10);
+
+  const rawToken    = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password:                 hashed,
+      roleId:                   role.id,
+      isEmailVerified:          false,
+      emailVerificationToken:   hashedToken,
+      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+    include: { role: true },
+  });
+
+  return { user, plainPassword: password, rawToken };
+}
+
+/**
+ * Deletes all refresh tokens for users matching the email pattern.
+ */
+export async function cleanupRefreshTokens(emailPattern) {
+  const users = await prisma.user.findMany({
+    where:  { email: { contains: emailPattern } },
+    select: { id: true },
+  });
+  if (users.length) {
+    await prisma.refreshToken.deleteMany({
+      where: { userId: { in: users.map((u) => u.id) } },
+    });
+  }
 }

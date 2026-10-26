@@ -64,9 +64,34 @@ model User {
   password  String
   roleId    String
   role      Role     @relation(fields: [roleId], references: [id])
-  isActive  Boolean  @default(true)   // false = deactivated / suspended
+  isActive  Boolean  @default(true)
+
+  // ── Email verification ───────────────────────────────────────────────────
+  isEmailVerified          Boolean   @default(false)
+  emailVerificationToken   String?   @unique
+  emailVerificationExpires DateTime?
+
+  // ── Password reset ───────────────────────────────────────────────────────
+  passwordResetToken       String?   @unique
+  passwordResetExpires     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshTokens RefreshToken[]
+
   @@map("users")
+}
+
+// ─── RefreshToken Model ───────────────────────────────────────────────────────
+// Stores hashed refresh tokens so they can be rotated and revoked server-side.
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique   // stores the SHA-256 hash of the raw token
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
 }
